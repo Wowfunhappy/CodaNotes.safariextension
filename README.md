@@ -16,6 +16,8 @@ And let’s not forget cool thing #2: **we literally added a new feature to Safa
 
 (**Tech Note:** The Coda Notes extension is built entirely in JavaScript, HTML, and CSS; the extension bar is basically an HTML file, and the page-flip effect is accomplished using a CSS transform. We draw on a transparent `canvas` element injected over the target page. Live text editing is done by setting the `contentEditable` attribute on the body of the page, thus turning Safari into an editor, similar to how Apple Mail works!)
 
+**Sending notes in this fork:** Panic's sending service no longer exists, so “Send Notes” now saves the annotated screenshot to your Downloads folder and opens a new message in your mail client, addressed and filled in with your comments and the page URL. Attach the screenshot and send. Checking “Send me a copy” adds your From address as a CC.
+
 Thanks to Apple for letting us play with Safari Extensions, and thanks to [Neven](https://twitter.com/mrgan‎) and [Garrett](https://twitter.com/garrettmoon) for such great quick work on this project.
 
 ## License

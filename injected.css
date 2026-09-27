@@ -130,7 +130,7 @@
 	-webkit-animation-fill-mode: forwards;								
 }
 
-.panicCodaNotes_postcardContainer.flipped {
+#panicCodaNotes_postcardContainer.flipped {
 	-webkit-animation-name: 'flip';
 	-webkit-animation-duration: 0.3s;
 	-webkit-animation-timing-function: ease-out;	

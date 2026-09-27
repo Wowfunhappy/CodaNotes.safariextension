@@ -120,7 +120,6 @@ var beforeSendScrollY;
 
 var sending = false;
 var valid = false;
-var sendingDone = false;
 
 var settings = false;
 
@@ -248,6 +247,12 @@ function cancelNotes () {
 	location.reload(true);
 }
 
+/* Newer WebKit reports transitions of -webkit-transform under the unprefixed name */
+function isTransformTransition(event) {
+	var propertyName = event.originalEvent.propertyName;
+	return propertyName == 'transform' || propertyName == '-webkit-transform';
+}
+
 /* set up the webpage to handle postcard animation and execute */
 function sendClicked(pageInfo) {
 	var imgURL = pageInfo[0];
@@ -316,18 +321,21 @@ function sendClicked(pageInfo) {
 				'left' : window.scrollX + 'px !important'
 				});
 		
+		// The screenshot was only just inserted; give it a computed style so the scale below transitions
+		$('#panicCodaNotes_screenshot').get(0).offsetWidth;
+
 		$('#panicCodaNotes_screenshot')
 			.css('-webkit-transition', 'all .3s ease')
 			.css('-webkit-transform', 'scale(' + percentage + ')')
 			.css('-webkit-border-radius', '30px')
 			.bind('webkitTransitionEnd.scale', function(event) {
-				if (event.originalEvent.propertyName == '-webkit-transform') {
+				if (isTransformTransition(event)) {
 					$(this)
 						.unbind('webkitTransitionEnd.scale')
 						.css('-webkit-transition-timing-function', 'linear')
 						.css('-webkit-transform', 'rotateY(90deg) ' + $(this).css('-webkit-transform'))
 						.bind('webkitTransitionEnd.flip', function(event){
-							if (event.originalEvent.propertyName == '-webkit-transform') {
+							if (isTransformTransition(event)) {
 								$(this).unbind('webkitTransitionEnd.flip');
 
 								var from_email = settings['from_email'];
@@ -422,56 +430,64 @@ function replaceForm() {
 
 // Send the form if we have all the required info
 function send() {
-	sendingDone = false;
+	var to = $.trim($('#email').val());
+	if ( ! to) {
+		showSendError('No recipient', 'Enter the email address to send your notes to.');
+		return;
+	}
+
 	$('#panicCodaNotes_panicStamp').css('display', 'block');
 	setTimeout("$('#panicCodaNotes_panicStamp').addClass('shown');", 100);
-	var flyoutTimeout = setTimeout("$('#panicCodaNotes_postcardContainer').addClass('flyOut');", 1000);
-	
-	var checkSending = function(){
-		if ( ! sendingDone) {
-			setTimeout(checkSending, 200);
-		}else{
-			location.reload(true);
-		}
-	}
+	setTimeout("$('#panicCodaNotes_postcardContainer').addClass('flyOut');", 1000);
 	
 	safari.self.tab.dispatchMessage("setSetting", {'name' : 'from_email', 'value' : $('#yourEmail').val()});
 	
-	var checkSendingTimeout = setTimeout(checkSending, 2000);
+	var host = location.hostname || 'page';
+	saveScreenshot('data:image/png;base64,' + $('#formImgUrl').val(), 'Coda Notes - ' + host + '.png');
+	openEmail(to, $('#subject').val(), $('#pronouncements').val(), $('#formUrl').val(), $('input[name=copyMe]').is(':checked') ? $.trim($('#yourEmail').val()) : '');
 
-	$.post("http://panic.com/codanotes/notes-send.php", $('form').serialize(), function(data, textStatus, request){
-		var failed = false;
-		var title = 'Uh oh';
-		var message = 'We had some trouble sending your notes. Maybe try again later?';
-		if (textStatus !== 'success') {
-			failed = true;
-		}else{
-			if (data['code'] !== 0){
-				title = data['result'];
-				message = data['more'];
-				failed = true;
-			}else {
-				sendingDone = true;
+	// Clear the notes once the postcard has flown off
+	setTimeout(function(){ location.reload(true); }, 2000);
+}
+
+/* Downloads the annotated screenshot so it can be attached to the email */
+function saveScreenshot(dataURL, filename) {
+	var link = document.createElement('a');
+	link.href = dataURL;
+	link.download = filename;
+	document.documentElement.appendChild(link);
+	link.click();
+	document.documentElement.removeChild(link);
+}
+
+/* Opens a new message in the default mail client */
+function openEmail(to, subject, comments, url, cc) {
+	var body = comments ? comments + '\r\n\r\n' + url : url;
+	var mailto = 'mailto:' + encodeURIComponent(to).replace(/%40/g, '@').replace(/%2C/gi, ',')
+		+ '?subject=' + encodeURIComponent(subject)
+		+ '&body=' + encodeURIComponent(body);
+	if (cc) {
+		mailto += '&cc=' + encodeURIComponent(cc);
+	}
+	// A navigation of this page would cancel the screenshot download, so load the mailto: in a hidden frame
+	var frame = document.createElement('iframe');
+	frame.style.display = 'none';
+	frame.src = mailto;
+	document.documentElement.appendChild(frame);
+}
+
+function showSendError(title, message) {
+	$("<div id='panicCodaNotes_dialog'><h2 class='title'></h2><p class='message'></p></div>")
+		.find('.title').text(title).end()
+		.find('.message').text(message).end()
+		.appendTo(document.body)
+		.dialog({
+			zIndex : 2147483646,
+			dialogClass : 'panicCodaNotes',
+			buttons : {
+				"Ok" : function(){$(this).dialog("close").remove();}
 			}
-		}
-		
-		if (failed) {
-			clearTimeout(checkSendingTimeout);
-			clearTimeout(flyoutTimeout);
-			$('#panicCodaNotes_panicStamp').css('display', 'none').removeClass('shown');
-			$('#panicCodaNotes_postcardContainer').removeClass('flyOut');
-
-			$("<div id='panicCodaNotes_dialog'><h2 class='title'>" + title + "</h2><p class='message'>" + message + "</p></div>")
-				.appendTo(document)
-				.dialog({
-					zIndex : 2147483646,
-					dialogClass : 'panicCodaNotes',
-					buttons : {
-						"Ok" : function(){$(this).dialog("close").remove();}
-					}
-				});
-		}
-	}, "json");
+		});
 }
 
 // Abandon this form
